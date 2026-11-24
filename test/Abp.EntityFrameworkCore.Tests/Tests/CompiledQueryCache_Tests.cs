@@ -8,7 +8,6 @@ using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore.Configuration;
-using Abp.EntityFrameworkCore.Extensions;
 using Abp.EntityFrameworkCore.Tests.Domain;
 using Abp.EntityFrameworkCore.Tests.Ef;
 using Abp.Modules;
@@ -17,6 +16,8 @@ using Castle.MicroKernel.Registration;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
 using Shouldly;
 using Xunit;
@@ -59,7 +60,7 @@ public abstract class CompiledQueryCache_Tests<TStartupModule> : AbpIntegratedTe
         _noteRepository = Resolve<IRepository<TenantNote>>();
         _orderRepository = Resolve<IRepository<TenantOrder>>();
 
-        using (var context = Resolve<QueryCacheDbContext>())
+        using (var context = Resolve<IDbContextResolver>().Resolve<QueryCacheDbContext>(null, null))
         {
             context.TenantNotes.AddRange(
                 new TenantNote { Title = "host-note" },
@@ -201,34 +202,52 @@ public abstract class CompiledQueryCache_Tests<TStartupModule> : AbpIntegratedTe
 [DependsOn(typeof(AbpEntityFrameworkCoreModule), typeof(AbpTestBaseModule))]
 public class CompiledQueryCacheWithoutAbpQueryCompilerTestModule : CompiledQueryCacheTestModuleBase
 {
-    protected override bool UseAbpQueryCompiler => false;
+    protected override bool? UseAbpQueryCompiler => null;
 }
 
 [DependsOn(typeof(AbpEntityFrameworkCoreModule), typeof(AbpTestBaseModule))]
 public class CompiledQueryCacheWithAbpQueryCompilerTestModule : CompiledQueryCacheTestModuleBase
 {
-    protected override bool UseAbpQueryCompiler => true;
+    protected override bool? UseAbpQueryCompiler => true;
+}
+
+[DependsOn(typeof(AbpEntityFrameworkCoreModule), typeof(AbpTestBaseModule))]
+public class CompiledQueryCompilerExplicitlyDisabledTestModule : CompiledQueryCacheTestModuleBase
+{
+    protected override bool? UseAbpQueryCompiler => false;
+
+    protected override void ConfigureOptions(DbContextOptionsBuilder<QueryCacheDbContext> options)
+    {
+        options.ReplaceService<IDatabase, CustomRelationalDatabase>();
+    }
 }
 
 public abstract class CompiledQueryCacheTestModuleBase : AbpModule
 {
-    protected abstract bool UseAbpQueryCompiler { get; }
+    protected abstract bool? UseAbpQueryCompiler { get; }
+
+    protected virtual void ConfigureOptions(DbContextOptionsBuilder<QueryCacheDbContext> options)
+    {
+    }
 
     public override void PreInitialize()
     {
         Configuration.UnitOfWork.IsolationLevel = IsolationLevel.Unspecified;
         Configuration.MultiTenancy.IsEnabled = true;
-        Configuration.Modules.AbpEfCore().UseAbpQueryCompiler = UseAbpQueryCompiler;
+        Configuration.UnitOfWork.RegisterFilter(QueryCacheDbContext.OrganizationUnitFilterName, true);
+        if (UseAbpQueryCompiler.HasValue)
+        {
+            Configuration.Modules.AbpEfCore().UseAbpQueryCompiler = UseAbpQueryCompiler.Value;
+        }
 
-        // A private memory cache gives every test its own EF Core service provider, so the
-        // model (built for this filter mode) and the compiled query cache are not shared
-        // with other tests.
+        // 每个用例共享各自的 SQLite 连接，独立的服务提供程序隔离模型和查询缓存。
         var inMemorySqlite = new SqliteConnection("Data Source=:memory:");
-        var options = new DbContextOptionsBuilder<QueryCacheDbContext>()
+        var optionsBuilder = new DbContextOptionsBuilder<QueryCacheDbContext>()
             .UseSqlite(inMemorySqlite)
             .UseMemoryCache(new MemoryCache(new MemoryCacheOptions()))
-            .AddAbpDbContextOptionsExtension()
-            .Options;
+            .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning));
+        ConfigureOptions(optionsBuilder);
+        var options = optionsBuilder.Options;
 
         IocManager.IocContainer.Register(
             Component
@@ -238,9 +257,12 @@ public abstract class CompiledQueryCacheTestModuleBase : AbpModule
         );
 
         inMemorySqlite.Open();
-        using (var context = new QueryCacheDbContext(options))
+        var schemaOptions = UseAbpQueryCompiler == true
+            ? (DbContextOptions<QueryCacheDbContext>)options.WithExtension(new AbpDbContextOptionsExtension())
+            : options;
+        using (var context = new QueryCacheDbContext(schemaOptions))
         {
-            context.AbpEfCoreConfiguration = new AbpEfCoreConfiguration(IocManager) { UseAbpQueryCompiler = UseAbpQueryCompiler };
+            context.AbpEfCoreConfiguration = Configuration.Modules.AbpEfCore();
             context.Database.EnsureCreated();
         }
     }

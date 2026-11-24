@@ -10,6 +10,9 @@ using Abp.EntityFrameworkCore.Tests.Ef;
 using Abp.Modules;
 using Abp.TestBase;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage;
 using Shouldly;
 using Xunit;
 
@@ -23,6 +26,24 @@ namespace Abp.EntityFrameworkCore.Tests.Tests;
 public class CompiledQueryFilter_WithoutAbpQueryCompiler_Tests
     : CompiledQueryFilter_Tests<CompiledQueryCacheWithoutAbpQueryCompilerTestModule>
 {
+    [Fact]
+    public async Task Should_Apply_Filters_With_Default_Configuration()
+    {
+        var query = EF.CompileQuery((QueryCacheDbContext db) => db.TenantNotes.OrderBy(n => n.Title).Select(n => n.Title));
+        var asyncQuery = EF.CompileAsyncQuery((QueryCacheDbContext db) => db.TenantNotes.OrderBy(n => n.Title).Select(n => n.Title));
+
+        (await RunAsync(1, async db =>
+        {
+            db.AbpEfCoreConfiguration.UseAbpQueryCompiler.ShouldBeFalse();
+            db.GetService<IDbContextOptions>().FindExtension<AbpDbContextOptionsExtension>().ShouldBeNull();
+
+            var expected = new[] { "tenant-1-note" };
+            db.TenantNotes.OrderBy(n => n.Title).Select(n => n.Title).ToArray().ShouldBe(expected);
+            query(db).ToArray().ShouldBe(expected);
+            return await ToArrayAsync(asyncQuery(db));
+        })).ShouldBe(new[] { "tenant-1-note" });
+    }
+
     // The filters are parameters of the compiled query, so they are applied on every run.
     [Fact]
     public void Should_Apply_Filters_To_Compiled_Query()
@@ -43,6 +64,22 @@ public class CompiledQueryFilter_WithoutAbpQueryCompiler_Tests
     {
         (await RunAsync(1, db => ToArrayAsync(CompiledNotesAsync(db)))).ShouldBe(new[] { "tenant-1-note" });
         (await RunAsync(2, db => ToArrayAsync(CompiledNotesAsync(db)))).ShouldBe(new[] { "tenant-2-note" });
+    }
+}
+
+public class CompiledQueryFilter_WithExplicitlyDisabledCompiler_Tests
+    : CompiledQueryFilter_Tests<CompiledQueryCompilerExplicitlyDisabledTestModule>
+{
+    [Fact]
+    public void Should_Keep_Custom_Database_And_Apply_Filters_When_Compiler_Is_Disabled()
+    {
+        Run(1, db =>
+        {
+            db.AbpEfCoreConfiguration.UseAbpQueryCompiler.ShouldBeFalse();
+            db.GetService<IDbContextOptions>().FindExtension<AbpDbContextOptionsExtension>().ShouldBeNull();
+            db.GetService<IDatabase>().ShouldBeOfType<CustomRelationalDatabase>();
+            return db.TenantNotes.Select(note => note.Title).ToArray();
+        }).ShouldBe(new[] { "tenant-1-note" });
     }
 }
 
@@ -74,7 +111,72 @@ public class CompiledQueryFilter_WithAbpQueryCompiler_Tests
     public async Task Should_Not_Run_Compiled_Async_Query_Without_Filters()
     {
         var exception = await Should.ThrowAsync<AbpException>(() => RunAsync(1, db => ToArrayAsync(CompiledNotesAsync(db))));
-        exception.Message.ShouldContain("AbpEntityQueryProvider");
+        exception.Message.ShouldContain("EF.CompileAsyncQuery");
+    }
+
+    [Fact]
+    public void Should_Reject_Sqlite_Compiled_Query_Within_Authorized_Outer_Scope()
+    {
+        var compiled = EF.CompileQuery((QueryCacheDbContext db) => db.TenantMemos.Select(memo => memo.Text));
+
+        Run(1, db =>
+        {
+            var current = GetSqliteFilterContext(db);
+            var outerQuery = db.TenantNotes.Select(note => note.Title);
+            using (current.BeginQuery(db))
+            {
+                // 用修复提供的作用域进入外层编译，内层经过实际的 EF Core 编译入口。
+                db.GetService<ICompiledQueryCacheKeyGenerator>().GenerateCacheKey(outerQuery.Expression, false);
+                using (current.BeginQueryCompilation(db, outerQuery.Expression))
+                {
+                    current.GetRequiredContext().ShouldBeSameAs(db);
+
+                    var results = new List<string>();
+                    var exception = Should.Throw<AbpException>(() => results.AddRange(compiled(db)));
+                    exception.Message.ShouldContain("outside of EF Core's normal query pipeline");
+                    results.ShouldBeEmpty();
+                    current.GetRequiredContext().ShouldBeSameAs(db);
+                }
+            }
+
+            current.Context.ShouldBeNull();
+            return outerQuery.ToArray();
+        }).ShouldBe(new[] { "tenant-1-note" });
+    }
+
+    [Fact]
+    public async Task Should_Reject_Sqlite_Compiled_Async_Query_Within_Authorized_Outer_Scope()
+    {
+        var compiled = EF.CompileAsyncQuery((QueryCacheDbContext db) => db.TenantMemos.Select(memo => memo.Text));
+
+        (await RunAsync(1, async db =>
+        {
+            var current = GetSqliteFilterContext(db);
+            var outerQuery = db.TenantNotes.Select(note => note.Title);
+            using (current.BeginQuery(db))
+            {
+                db.GetService<ICompiledQueryCacheKeyGenerator>().GenerateCacheKey(outerQuery.Expression, true);
+                using (current.BeginQueryCompilation(db, outerQuery.Expression))
+                {
+                    current.GetRequiredContext().ShouldBeSameAs(db);
+
+                    var results = new List<string>();
+                    var exception = await Should.ThrowAsync<AbpException>(async () =>
+                    {
+                        await foreach (var result in compiled(db))
+                        {
+                            results.Add(result);
+                        }
+                    });
+                    exception.Message.ShouldContain("outside of EF Core's normal query pipeline");
+                    results.ShouldBeEmpty();
+                    current.GetRequiredContext().ShouldBeSameAs(db);
+                }
+            }
+
+            current.Context.ShouldBeNull();
+            return await outerQuery.ToArrayAsync();
+        })).ShouldBe(new[] { "tenant-1-note" });
     }
 
     [Fact]
@@ -86,9 +188,48 @@ public class CompiledQueryFilter_WithAbpQueryCompiler_Tests
         Run(1, db => db.TenantOrders.Select(o => o.Number).OrderBy(n => n).ToArray()).ShouldBe(new[] { "tenant-1-order" });
     }
 
+    [Fact]
+    public async Task Should_Require_Context_For_Custom_Filter_Translation()
+    {
+        var query = EF.CompileQuery((QueryCacheDbContext db) => db.OrganizationUnitNotes.Select(note => note.Title));
+        var asyncQuery = EF.CompileAsyncQuery((QueryCacheDbContext db) => db.OrganizationUnitNotes.Select(note => note.Title));
+
+        Run(1, db =>
+        {
+            db.AbpEfCoreConfiguration.UseAbpQueryCompiler.ShouldBeTrue();
+            db.GetService<IDatabase>().ShouldBeOfType<AbpEfCoreDatabase>();
+            return db.OrganizationUnitNotes.Select(note => note.Title).ToArray();
+        }).ShouldBe(new[] { "unit-note" });
+
+        ShouldThrowFilterException(() => Run(1, db => query(db).ToArray()));
+        var exception = await Should.ThrowAsync<AbpException>(() => RunAsync(1, db => ToArrayAsync(asyncQuery(db))));
+        exception.Message.ShouldContain(nameof(EF.CompileAsyncQuery));
+    }
+
+    [Fact]
+    public async Task Should_Run_Compiled_Queries_Without_A_Configured_Filter()
+    {
+        var query = EF.CompileQuery((QueryCacheDbContext db, int id) => db.PublicQueryNotes
+            .Where(note => note.Id == id).Select(note => note.Title));
+        var asyncQuery = EF.CompileAsyncQuery((QueryCacheDbContext db, int id) => db.PublicQueryNotes
+            .Where(note => note.Id == id).Select(note => note.Title));
+
+        Run(1, db => query(db, 1).ToArray()).ShouldBe(new[] { "public-note" });
+        (await RunAsync(1, db => ToArrayAsync(asyncQuery(db, 1)))).ShouldBe(new[] { "public-note" });
+    }
+
     private static void ShouldThrowFilterException(Action action)
     {
-        Should.Throw<AbpException>(action).Message.ShouldContain("AbpEntityQueryProvider");
+        Should.Throw<AbpException>(action).Message.ShouldContain("EF.CompileQuery");
+    }
+
+    private static AbpEfCoreCurrentDbContext GetSqliteFilterContext(QueryCacheDbContext db)
+    {
+        db.Database.ProviderName.ShouldBe("Microsoft.EntityFrameworkCore.Sqlite");
+        db.AbpEfCoreConfiguration.UseAbpQueryCompiler.ShouldBeTrue();
+        db.IsMayHaveTenantFilterEnabled.ShouldBeTrue();
+        db.GetService<IDatabase>().ShouldBeOfType<AbpEfCoreDatabase>();
+        return db.GetService<AbpEfCoreCurrentDbContext>();
     }
 }
 
@@ -119,7 +260,7 @@ public abstract class CompiledQueryFilter_Tests<TStartupModule> : AbpIntegratedT
         _unitOfWorkManager = Resolve<IUnitOfWorkManager>();
         _noteRepository = Resolve<IRepository<TenantNote>>();
 
-        using (var context = Resolve<QueryCacheDbContext>())
+        using (var context = Resolve<IDbContextResolver>().Resolve<QueryCacheDbContext>(null, null))
         {
             context.TenantNotes.AddRange(
                 new TenantNote { Title = "host-note" },
@@ -137,6 +278,15 @@ public abstract class CompiledQueryFilter_Tests<TStartupModule> : AbpIntegratedT
             context.TenantOrders.AddRange(
                 new TenantOrder { Number = "tenant-1-order", TenantId = 1 },
                 new TenantOrder { Number = "tenant-2-order", TenantId = 2 }
+            );
+
+            context.OrganizationUnitNotes.AddRange(
+                new OrganizationUnitNote { Title = "unit-note", OrganizationUnitId = 7 },
+                new OrganizationUnitNote { Title = "other-unit-note", OrganizationUnitId = 8 }
+            );
+            context.PublicQueryNotes.AddRange(
+                new PublicQueryNote { Id = 1, Title = "public-note" },
+                new PublicQueryNote { Id = 2, Title = "other-public-note" }
             );
 
             context.SaveChanges();
