@@ -30,4 +30,5 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
   </ItemGroup>
 
+  <Import Project="..\..\nupkg\r2-candidate.props" Condition="'$(DuCoreCandidatePack)' == 'true'" />
 </Project>

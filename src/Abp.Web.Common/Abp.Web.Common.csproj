@@ -32,4 +32,5 @@
     <ProjectReference Include="..\Abp\Abp.csproj" />
   </ItemGroup>
 
+  <Import Project="..\..\nupkg\r2-candidate.props" Condition="'$(DuCoreCandidatePack)' == 'true'" />
 </Project>
