@@ -2,7 +2,7 @@
   <Import Project="..\..\common.props" />
   <Import Project="..\..\configureawait.props" />
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Abp.AspNetCore</AssemblyName>
     <PackageId>Abp.AspNetCore</PackageId>
@@ -30,7 +30,14 @@
   <ItemGroup>
     <PackageReference Include="Castle.LoggingFacility.MsLogging" Version="3.1.0" />
     <PackageReference Include="Castle.Windsor.MsDependencyInjection" Version="4.1.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.18" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="9.0.18" />
   </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="10.0.15" />
+  </ItemGroup>
+
 </Project>

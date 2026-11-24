@@ -1,4 +1,4 @@
-name: "build and test"
+name: Windows 构建与测试
 
 on:
   pull_request:
@@ -7,24 +7,96 @@ on:
       - '**/*.cshtml'
       - '**/*.csproj'
       - '**/*.razor'
+      - '**/*.props'
+      - '**/*.targets'
+      - '.github/workflows/build-and-test.yml'
+      - 'global.json'
+      - 'Abp.sln'
 
 permissions:
   contents: read
 
 jobs:
   build:
-
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 9.0.100-rc.2.24474.11
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 准备 .NET 10 SDK 和 .NET 9 共享运行时
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/r1-dotnet
+        with:
+          dotnet-version: |
+            10.0.404
+            9.0.321
+          architecture: x64
+          skip-lts-prepass: true
+
+      - name: 核对候选与工具链
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          New-Item -ItemType Directory -Path evidence -Force | Out-Null
+          "PR head: $env:PR_HEAD_SHA" | Set-Content evidence/input.log
+          "Run: $env:GITHUB_RUN_ID/$env:GITHUB_RUN_ATTEMPT, runner: $env:RUNNER_OS/$env:RUNNER_ARCH" | Add-Content evidence/input.log
+          git rev-parse HEAD 'HEAD^{tree}' | Tee-Object -FilePath evidence/input.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet --info | Tee-Object -FilePath evidence/input.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0 -or $sdk -ne '10.0.404') { throw "实际 SDK 为 $sdk" }
+          $runtimes = dotnet --list-runtimes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runtimes | Tee-Object -FilePath evidence/input.log -Append
+          foreach ($framework in 'Microsoft.NETCore.App', 'Microsoft.AspNetCore.App') {
+            foreach ($version in '10.0.15', '9.0.23') {
+              if (-not ($runtimes -like "$framework $version *")) {
+                throw "缺少共享运行时 $framework $version"
+              }
+            }
+          }
+
+      - name: 还原默认解决方案
+        run: |
+          dotnet restore Abp.sln -p:Configuration=Release -p:GeneratePackageOnBuild=false 2>&1 |
+            Tee-Object -FilePath evidence/restore.log
+          exit $LASTEXITCODE
+
+      - name: 构建默认解决方案的 Release 目标
+        run: |
+          dotnet build Abp.sln -c Release --no-restore -p:GeneratePackageOnBuild=false 2>&1 |
+            Tee-Object -FilePath evidence/build.log
+          exit $LASTEXITCODE
+
+      - name: 核对五个核心项目的双目标程序集
+        run: |
+          $projects = 'Abp', 'Abp.AspNetCore', 'Abp.EntityFramework.Common', 'Abp.EntityFrameworkCore', 'Abp.Web.Common'
+          foreach ($project in $projects) {
+            foreach ($target in 'net9.0', 'net10.0') {
+              $dll = dotnet msbuild "src/$project/$project.csproj" -nologo -p:Configuration=Release "-p:TargetFramework=$target" -p:GeneratePackageOnBuild=false -getProperty:TargetPath
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              if (-not (Test-Path -LiteralPath $dll -PathType Leaf)) { throw "找不到 $project $target 的 Release 产物 $dll" }
+              $hash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
+              "$project $target $hash $dll" | Tee-Object -FilePath evidence/assemblies.log -Append
+            }
+          }
+
+      - name: 测试默认解决方案的 Release 目标
+        run: |
+          dotnet test Abp.sln -c Release --no-build --no-restore -p:GeneratePackageOnBuild=false --logger "trx;LogFilePrefix=results" --verbosity normal 2>&1 |
+            Tee-Object -FilePath evidence/test.log
+          exit $LASTEXITCODE
+
+      - name: 上传当次日志与测试结果
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-release-${{ github.run_attempt }}
+          path: |
+            evidence/
+            **/TestResults/*.trx
+          if-no-files-found: warn

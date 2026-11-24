@@ -12,6 +12,7 @@ using Abp.FluentValidation;
 using Abp.Localization;
 using Abp.MultiTenancy;
 using Abp.Reflection.Extensions;
+using Abp.Resources.Embedded;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,9 @@ public class AppModule : AbpModule
 {
     public override void PreInitialize()
     {
+        Configuration.EmbeddedResources.Sources.Add(new EmbeddedResourceSet(
+            "/Views/", typeof(AppModule).Assembly, "Abp.AspNetCore.App.Views"));
+
         Configuration.Auditing.IsEnabledForAnonymousUsers = true;
 
         Configuration.ReplaceService<IAuditingStore, MockAuditingStore>();

@@ -2,7 +2,7 @@
   <Import Project="..\..\common.props" />
   <Import Project="..\..\configureawait.props" />
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Abp.AspNetCore.TestBase</AssemblyName>
     <PackageId>Abp.AspNetCore.TestBase</PackageId>
@@ -20,7 +20,11 @@
     <ProjectReference Include="..\Abp.AspNetCore\Abp.AspNetCore.csproj" />
     <ProjectReference Include="..\Abp.TestBase\Abp.TestBase.csproj" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.18" />
   </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.15" />
+  </ItemGroup>
+
 </Project>

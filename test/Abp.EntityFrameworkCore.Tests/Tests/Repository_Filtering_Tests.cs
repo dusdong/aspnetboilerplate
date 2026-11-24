@@ -1,6 +1,7 @@
 using Abp.Configuration.Startup;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
+using Abp.EntityFrameworkCore.Repositories;
 using Abp.EntityFrameworkCore.Tests.Domain;
 using Shouldly;
 using System;
@@ -52,6 +53,29 @@ public class Repository_Filtering_Tests : EntityFrameworkCoreModuleTestBase
                 posts.Any(p => p.IsDeleted).ShouldBeTrue();
             }
         }
+    }
+
+    [Fact]
+    public async Task Should_Update_Only_Matching_Active_Posts_In_Current_Tenant()
+    {
+        const string updatedBody = "updated";
+        using (var uow = _unitOfWorkManager.Begin())
+        {
+            var affectedRows = await _postRepository.BatchUpdateAsync(
+                setters => setters.SetProperty(post => post.Body, updatedBody),
+                post => post.Title != "test-post-2-title");
+
+            affectedRows.ShouldBe(1);
+            await uow.CompleteAsync();
+        }
+
+        var posts = await UsingDbContextAsync(context => context.Posts
+            .IgnoreQueryFilters()
+            .OrderBy(post => post.Title)
+            .Select(post => post.Body)
+            .ToListAsync());
+
+        posts.ShouldBe(new[] { updatedBody, "test-post-2-body", "test-post-3-body-deleted", "test-post-4-body" });
     }
 
     [Fact]

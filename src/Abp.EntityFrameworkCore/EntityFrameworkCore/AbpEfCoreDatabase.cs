@@ -45,6 +45,15 @@ public class AbpEfCoreDatabase : IDatabase
     }
 
 #pragma warning disable EF9100
+#if NET10_0_OR_GREATER
+    public virtual Expression<Func<QueryContext, TResult>> CompileQueryExpression<TResult>(Expression query, bool async)
+    {
+        using (AbpEfCoreCurrentDbContext.BeginQueryCompilation(CurrentDbContext.Context as AbpDbContext, query))
+        {
+            return InnerDatabase.CompileQueryExpression<TResult>(query, async);
+        }
+    }
+#else
     public virtual Expression<Func<QueryContext, TResult>> CompileQueryExpression<TResult>(
         Expression query,
         bool async,
@@ -55,5 +64,6 @@ public class AbpEfCoreDatabase : IDatabase
             return InnerDatabase.CompileQueryExpression<TResult>(query, async, nonNullableReferenceTypeParameters);
         }
     }
+#endif
 #pragma warning restore EF9100
 }

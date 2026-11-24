@@ -124,7 +124,8 @@ public static class AbpServiceCollectionExtensions
         //Configure MVC
         services.Configure<MvcOptions>(mvcOptions => { mvcOptions.AddAbp(services); });
 
-        //Configure Razor
+        // 保留使用 Razor 运行时编译的现有应用对嵌入式视图的访问。
+#pragma warning disable ASPDEPR003
         services.Insert(0,
             ServiceDescriptor.Singleton<IConfigureOptions<MvcRazorRuntimeCompilationOptions>>(
                 new ConfigureOptions<MvcRazorRuntimeCompilationOptions>(
@@ -132,6 +133,7 @@ public static class AbpServiceCollectionExtensions
                 )
             )
         );
+#pragma warning restore ASPDEPR003
 
         services.AddHttpClient(AspNetCoreWebhookSender.WebhookSenderHttpClientName);
     }
