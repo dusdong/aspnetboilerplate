@@ -27,4 +27,5 @@
   <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'">
     <PackageReference Include="Du.Abp" Version="[10.5.1-r2.1]" />
   </ItemGroup>
+  <Import Project="../../nupkg/r4-candidate.props" Condition="'$(DuR4Pack)' == 'true'" />
 </Project>

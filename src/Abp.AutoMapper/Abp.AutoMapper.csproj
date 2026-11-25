@@ -41,4 +41,5 @@
     <PackageReference Include="Du.AutoMapper.Collection" Version="[$(DuR3AutoMapperCollectionVersion)]" />
   </ItemGroup>
 
+  <Import Project="../../nupkg/r4-candidate.props" Condition="'$(DuR4Pack)' == 'true'" />
 </Project>

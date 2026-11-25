@@ -23,4 +23,5 @@
     <ProjectReference Include="..\Abp\Abp.csproj" />
   </ItemGroup>
   <Import Project="..\..\nupkg\r3-leaf-candidate.props" Condition="'$(DuR3CandidatePack)' == 'true'" />
+  <Import Project="../../nupkg/r4-candidate.props" Condition="'$(DuR4Pack)' == 'true'" />
 </Project>

@@ -19,4 +19,5 @@
     <PackageReference Include="Du.Abp.EntityFrameworkCore" Version="[10.5.1-r2.1]" />
     <PackageReference Include="Du.Abp.ZeroCore" Version="[$(DuR3CandidatePackageVersion)]" />
   </ItemGroup>
+  <Import Project="../../nupkg/r4-candidate.props" Condition="'$(DuR4Pack)' == 'true'" />
 </Project>

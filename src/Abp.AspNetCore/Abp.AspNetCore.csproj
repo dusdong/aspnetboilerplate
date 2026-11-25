@@ -41,4 +41,8 @@
   </ItemGroup>
 
   <Import Project="..\..\nupkg\r2-candidate.props" Condition="'$(DuCoreCandidatePack)' == 'true'" />
+  <PropertyGroup Condition="'$(DuR4Pack)' == 'true'">
+    <DuR4CorePackage>true</DuR4CorePackage>
+  </PropertyGroup>
+  <Import Project="../../nupkg/r4-candidate.props" Condition="'$(DuR4Pack)' == 'true'" />
 </Project>

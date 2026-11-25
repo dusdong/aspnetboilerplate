@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <PackageId>Du.$(PackageId)</PackageId>
+    <PackageVersion>10.5.1</PackageVersion>
+    <_DuR4FrameworkDependencyVersion Condition="'$(DuR4CorePackage)' == 'true'">$(PackageVersion)</_DuR4FrameworkDependencyVersion>
+    <_DuR4FrameworkDependencyVersion Condition="'$(DuR4CorePackage)' != 'true'">[$(PackageVersion)]</_DuR4FrameworkDependencyVersion>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageProjectUrl>https://github.com/dusdong/aspnetboilerplate</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/dusdong/aspnetboilerplate.git</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="@(ProjectReference->'Du.%(Filename)')" Version="$(_DuR4FrameworkDependencyVersion)" />
+    <ProjectReference Remove="@(ProjectReference)" />
+    <None Include="$(DuR4Readme)" Pack="true" PackagePath="README.md" Visible="false" Condition="'$(DuR4Readme)' != ''" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Abp.AutoMapper'">
+    <PackageReference Remove="AutoMapper;AutoMapper.Collection" />
+    <PackageReference Include="Du.AutoMapper" Version="[14.0.0]" />
+    <PackageReference Include="Du.AutoMapper.Collection" Version="[11.0.0]" />
+  </ItemGroup>
+</Project>
