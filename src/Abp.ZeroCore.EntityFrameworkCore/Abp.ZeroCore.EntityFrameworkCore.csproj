@@ -10,8 +10,13 @@
     <PackageTags>asp.net;asp.net mvc;boilerplate;application framework;web framework;framework;domain driven design;multitenancy;user management;role management;identity;entity framework core</PackageTags>
     <Description>Abp.ZeroCore.EntityFrameworkCore</Description>
   </PropertyGroup>
-  <ItemGroup>
+  <Import Project="..\..\nupkg\r3-module-zero-candidate.props" Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'" />
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' != 'true'">
     <ProjectReference Include="..\Abp.EntityFrameworkCore\Abp.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\Abp.ZeroCore\Abp.ZeroCore.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'">
+    <PackageReference Include="Du.Abp.EntityFrameworkCore" Version="[10.5.1-r2.1]" />
+    <PackageReference Include="Du.Abp.ZeroCore" Version="[$(DuR3CandidatePackageVersion)]" />
   </ItemGroup>
 </Project>

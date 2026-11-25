@@ -20,7 +20,11 @@
     <EmbeddedResource Include="Zero\Localization\Source\*.xml" />
   </ItemGroup>
 
-  <ItemGroup>
+  <Import Project="..\..\nupkg\r3-module-zero-candidate.props" Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'" />
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' != 'true'">
     <ProjectReference Include="..\Abp\Abp.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'">
+    <PackageReference Include="Du.Abp" Version="[10.5.1-r2.1]" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,29 @@
+{
+  "frameworkTree": "fb0abb6be5cb69b0e5ff395f4b010cf28511f9c8",
+  "version": "10.5.1-r2.1",
+  "manifestSha256": "fed4d30960f9c25f444c35ffadedd3746baeefbca2a78e5938ccde1f38d0b3fc",
+  "packages": {
+    "Du.Abp": {
+      "archiveSha256": "0f6d9da908af7b6b51bedb5b942be8fcdc54fa6b07897224dfb2a647c4e75769",
+      "assetPath": "lib/net9.0/Abp.dll",
+      "assetSha256": "142c0f3d540e909c720996086386089394a180c16289e237cc1a228601bfbc35",
+      "dependencies": {}
+    },
+    "Du.Abp.EntityFramework.Common": {
+      "archiveSha256": "cc8be8158fd8bde6b8c2a6374ca1fb362b14965e17435df2f1b8780217a57234",
+      "assetPath": "lib/net9.0/Abp.EntityFramework.Common.dll",
+      "assetSha256": "6db9c08c5baf7620ff96fa259cda7157cf26f1a36fbd7eca2594e51784330d35",
+      "dependencies": {
+        "Du.Abp": "10.5.1-r2.1"
+      }
+    },
+    "Du.Abp.EntityFrameworkCore": {
+      "archiveSha256": "a3e8caf24c765be13877ee7cd48908b951d25a1a61fb837a99eb5fece9d8dbb6",
+      "assetPath": "lib/net9.0/Abp.EntityFrameworkCore.dll",
+      "assetSha256": "243486fb3e5baeed05453739db180ece03e8631d0d159ea9976cdd3b325c0932",
+      "dependencies": {
+        "Du.Abp.EntityFramework.Common": "10.5.1-r2.1"
+      }
+    }
+  }
+}

@@ -22,7 +22,11 @@
   <ItemGroup>
     <EmbeddedResource Include="Zero\Localization\SourceExt\*.xml" />
   </ItemGroup>
-  <ItemGroup>
+  <Import Project="..\..\nupkg\r3-module-zero-candidate.props" Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'" />
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' != 'true'">
     <ProjectReference Include="..\Abp.Zero.Common\Abp.Zero.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DuR3ModuleZeroCandidatePack)' == 'true'">
+    <PackageReference Include="Du.Abp.Zero.Common" Version="[$(DuR3CandidatePackageVersion)]" />
   </ItemGroup>
 </Project>
