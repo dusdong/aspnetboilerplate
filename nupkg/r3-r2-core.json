@@ -1,0 +1,8 @@
+{
+  "id": "Du.Abp",
+  "version": "10.5.1-r2.1",
+  "archiveFile": "Du.Abp.10.5.1-r2.1.nupkg",
+  "archiveSha256": "0f6d9da908af7b6b51bedb5b942be8fcdc54fa6b07897224dfb2a647c4e75769",
+  "assetPath": "lib/net9.0/Abp.dll",
+  "assetSha256": "142c0f3d540e909c720996086386089394a180c16289e237cc1a228601bfbc35"
+}

@@ -19,7 +19,8 @@
     <IsPackable>true</IsPackable>
     <OutputType>Library</OutputType>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(DuR3CandidatePack)' != 'true'">
     <ProjectReference Include="..\Abp\Abp.csproj" />
   </ItemGroup>
+  <Import Project="..\..\nupkg\r3-leaf-candidate.props" Condition="'$(DuR3CandidatePack)' == 'true'" />
 </Project>
