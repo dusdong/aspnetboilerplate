@@ -20,13 +20,25 @@
     <Description>Abp.AutoMapper</Description>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Abp\Abp.csproj" />
-  </ItemGroup>
+  <PropertyGroup Condition="'$(DuR3AutoMapperCandidate)' == 'true'">
+    <PackageId>Du.Abp.AutoMapper</PackageId>
+    <PackageVersion>$(DuR3AutoMapperCandidateVersion)</PackageVersion>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <RepositoryUrl>https://github.com/dusdong/aspnetboilerplate.git</RepositoryUrl>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(DuR3AutoMapperCandidate)' != 'true'">
+    <ProjectReference Include="..\Abp\Abp.csproj" />
     <PackageReference Include="AutoMapper" Version="14.0.0" />
     <PackageReference Include="AutoMapper.Collection" Version="11.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DuR3AutoMapperCandidate)' == 'true'">
+    <PackageReference Include="Du.Abp" Version="[10.5.1-r2.1]" />
+    <PackageReference Include="Du.AutoMapper" Version="[$(DuR3AutoMapperEngineVersion)]" />
+    <PackageReference Include="Du.AutoMapper.Collection" Version="[$(DuR3AutoMapperCollectionVersion)]" />
   </ItemGroup>
 
 </Project>
