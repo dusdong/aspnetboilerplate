@@ -18,3 +18,5 @@ DOTNET="$DOTNET" bash nupkg/pack-r4.sh automapper "$ADAPTER_OUT" \
 ```
 
 三个输入包复制到该次适配器生产的隔离本地源，摘要记录在 `inputs.sha256`。两个入口均输出 `feed/`、`symbols/`、生产提交、实际 SDK、命令、阶段日志、还原图及包摘要。普通构建和 R2、R3 候选仍沿用原有入口。
+
+R5 本地补丁使用 `automapper-r5` 子命令，传入公开 `Du.Abp 10.5.1`、候选 `Du.AutoMapper 14.0.1` 和候选 `Du.AutoMapper.Collection 11.0.1` 主包。核对三份输入摘要后制备 `Du.Abp.AutoMapper 10.5.2` 主包及符号包。适配器对 ABP 内核保留 `[10.5.1]` 依赖。生产时记录输入工作树和回放补丁，打包元数据的 Git 提交标识定位未修改的编译源码。

@@ -13,6 +13,11 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(DuR5AutoMapperPack)' == 'true' and '$(MSBuildProjectName)' == 'Abp.AutoMapper'">
+    <PackageVersion>10.5.2</PackageVersion>
+    <InformationalVersion>$(PackageVersion)</InformationalVersion>
+    <_DuR4FrameworkDependencyVersion>[10.5.1]</_DuR4FrameworkDependencyVersion>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="@(ProjectReference->'Du.%(Filename)')" Version="$(_DuR4FrameworkDependencyVersion)" />
     <ProjectReference Remove="@(ProjectReference)" />
@@ -20,7 +25,9 @@
   </ItemGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'Abp.AutoMapper'">
     <PackageReference Remove="AutoMapper;AutoMapper.Collection" />
-    <PackageReference Include="Du.AutoMapper" Version="[14.0.0]" />
-    <PackageReference Include="Du.AutoMapper.Collection" Version="[11.0.0]" />
+    <PackageReference Include="Du.AutoMapper" Version="[14.0.0]" Condition="'$(DuR5AutoMapperPack)' != 'true'" />
+    <PackageReference Include="Du.AutoMapper.Collection" Version="[11.0.0]" Condition="'$(DuR5AutoMapperPack)' != 'true'" />
+    <PackageReference Include="Du.AutoMapper" Version="[14.0.1]" Condition="'$(DuR5AutoMapperPack)' == 'true'" />
+    <PackageReference Include="Du.AutoMapper.Collection" Version="[11.0.1]" Condition="'$(DuR5AutoMapperPack)' == 'true'" />
   </ItemGroup>
 </Project>

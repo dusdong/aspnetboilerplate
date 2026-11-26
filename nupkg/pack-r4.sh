@@ -3,18 +3,18 @@ set -euo pipefail
 
 usage() {
     printf '%s\n' '用法：bash nupkg/pack-r4.sh framework <新输出目录>' \
-        '      bash nupkg/pack-r4.sh automapper <新输出目录> <Du.Abp 主包> <Du.AutoMapper 主包> <Du.AutoMapper.Collection 主包>' >&2
+        '      bash nupkg/pack-r4.sh {automapper|automapper-r5} <新输出目录> <Du.Abp 主包> <Du.AutoMapper 主包> <Du.AutoMapper.Collection 主包>' >&2
     exit 2
 }
 
 case "${1:-}" in
     framework) [[ $# -eq 2 ]] || usage ;;
-    automapper) [[ $# -eq 5 ]] || usage ;;
+    automapper|automapper-r5) [[ $# -eq 5 ]] || usage ;;
     *) usage ;;
 esac
 
 source=$(cd "$(dirname "$0")/.." && pwd -P)
-if [[ -n "$(git -C "$source" status --porcelain=v1 --untracked-files=all)" ]]; then
+if [[ "$1" != automapper-r5 && -n "$(git -C "$source" status --porcelain=v1 --untracked-files=all)" ]]; then
     echo 'R4 需要干净的生产提交。' >&2
     exit 1
 fi
@@ -24,9 +24,16 @@ mkdir -- "$2"
 output=$(cd "$2" && pwd -P)
 trap 'printf "%s\n" "$?" > "$output/exit-code.txt"' EXIT
 mkdir "$output/feed" "$output/symbols" "$output/logs" "$output/packed" "$output/readmes"
-if [[ "$1" == automapper ]]; then
+version=10.5.1
+patch_properties=()
+if [[ "$1" != framework ]]; then
     mkdir "$output/inputs"
     expected=(Du.Abp.10.5.1.nupkg Du.AutoMapper.14.0.0.nupkg Du.AutoMapper.Collection.11.0.0.nupkg)
+    if [[ "$1" == automapper-r5 ]]; then
+        version=10.5.2
+        patch_properties=(-p:DuR5AutoMapperPack=true)
+        expected=(Du.Abp.10.5.1.nupkg Du.AutoMapper.14.0.1.nupkg Du.AutoMapper.Collection.11.0.1.nupkg)
+    fi
     index=0
     for archive in "${@:3}"; do
         [[ -f "$archive" && "${archive##*/}" == "${expected[$index]}" ]] || usage
@@ -79,16 +86,19 @@ pack() {
     local readme="$output/readmes/$project/README.md"
     local properties=(-p:Configuration=Release -p:UseSharedCompilation=false "-p:ArtifactsPath=$output/artifacts"
         -p:DuR4Pack=true "-p:DuR4Readme=$readme" "-p:RepositoryCommit=$commit")
+    if [[ ${#patch_properties[@]} -gt 0 ]]; then
+        properties+=("${patch_properties[@]}")
+    fi
     mkdir "$(dirname "$readme")"
-    sed "s/@PACKAGE@/$package/g" "$source/nupkg/README.r4-package.md" > "$readme"
+    sed -e "s/@PACKAGE@/$package/g" -e "s/10\.5\.1/$version/g" "$source/nupkg/README.r4-package.md" > "$readme"
     run "$project-restore" "$dotnet" restore "$project_file" "${properties[@]}" \
         --configfile "$output/NuGet.Config" --disable-build-servers
     run "$project-build" "$dotnet" build "$project_file" "${properties[@]}" \
         --no-restore --disable-build-servers --verbosity normal
     run "$project-pack" "$dotnet" pack "$project_file" "${properties[@]}" \
         --no-build --no-restore --disable-build-servers --output "$output/packed"
-    mv -- "packed/$package.10.5.1.nupkg" feed/
-    mv -- "packed/$package.10.5.1.snupkg" symbols/
+    mv -- "packed/$package.$version.nupkg" feed/
+    mv -- "packed/$package.$version.snupkg" symbols/
 }
 
 run sdk "$dotnet" --info
